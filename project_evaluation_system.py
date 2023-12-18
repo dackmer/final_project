@@ -31,12 +31,47 @@ class CSVReader:
         return data
 
 
+class AdvisorPendingRequestTable:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.entries = []
+        self.load_entries()
+
+    def load_entries(self):
+        csv_reader = CSVReader(self.file_path)
+        self.entries = csv_reader.read_csv()
+
+    def insert_request(self, project_id, to_be_advisor):
+        request = {
+            "ProjectID": project_id,
+            "to_be_advisor": to_be_advisor,
+            "Response": "",
+            "Response_date": ""
+        }
+        self.entries.append(request)
+
+    def update_request_response(self, project_id, to_be_advisor, response, response_date):
+        for entry in self.entries:
+            if entry["ProjectID"] == project_id and entry["to_be_advisor"] == to_be_advisor:
+                entry["Response"] = response
+                entry["Response_date"] = response_date
+
+    def save_to_csv(self):
+        with open(self.file_path, mode='w', newline='') as f:
+            fieldnames = self.entries[0].keys() if self.entries else []
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            writer.writeheader()
+            writer.writerows(self.entries)
+
+
 class CSVTable:
     def __init__(self, file_path):
         self.file_path = file_path
         self.entries = []
         self.load_entries()
         self.evaluations = ProjectEvaluation()
+        self.advisor_pending_requests = AdvisorPendingRequestTable("advisor_pending_requests.csv")
 
     def load_entries(self):
         csv_reader = CSVReader(self.file_path)
@@ -63,6 +98,17 @@ class CSVTable:
 
     def get_project_evaluations(self, project_id):
         return self.evaluations.get_evaluations_for_project(project_id)
+
+    def insert_advisor_request(self, project_id, to_be_advisor):
+        self.advisor_pending_requests.insert_request(project_id, to_be_advisor)
+
+    def update_advisor_request_response(self, project_id, to_be_advisor, response, response_date):
+        self.advisor_pending_requests.update_request_response(project_id, to_be_advisor, response, response_date)
+
+    def view_advisor_requests(self):
+        for request in self.advisor_pending_requests.entries:
+            print(f"ProjectID: {request['ProjectID']}, to_be_advisor: {request['to_be_advisor']}, "
+                  f"Response: {request['Response']}, Response_date: {request['Response_date']}")
 
 
 class CSVDatabase:
@@ -159,9 +205,11 @@ def menu(database):
         print("1. View Usernames and IDs")
         print("2. Add User (Admin Only)")
         print("3. Delete User (Admin Only)")
-        print("4. Exit")
+        print("4. View Advisor Pending Requests (Admin Only)")
+        print("5. Respond to Advisor Requests (Admin Only)")
+        print("6. Exit")
 
-        choice = input("Enter your choice (1-4): ")
+        choice = input("Enter your choice (1-6): ")
 
         if choice == "1":
             show_user_info(database)
@@ -170,10 +218,14 @@ def menu(database):
         elif choice == "3":
             delete_user(database)
         elif choice == "4":
+            database.tables["PersonsTable"].view_advisor_requests()
+        elif choice == "5":
+            database.tables["PersonsTable"].update_advisor_request_response()
+        elif choice == "6":
             exit(database)
             break
         else:
-            print("Invalid choice. Please enter a number between 1 and 4.")
+            print("Invalid choice. Please enter a number between 1 and 6.")
 
 
 # Example usage
@@ -224,21 +276,3 @@ if val:
                 print("Project Evaluations:")
                 for eval in evaluations:
                     print(f"Evaluator: {eval['evaluator_id']}, Comments: {eval['comments']}, Rating: {eval['rating']}")
-
-
-# def view_member_requests(database):
-#     member_requests_table = database.tables["MemberPendingRequestTable"]
-#     for request in member_requests_table.entries:
-#         print(f"ProjectID: {request['ProjectID']}, to_be_member: {request['to_be_member']}, Response: {request['Response']}, Response_date: {request['Response_date']}")
-#
-#
-# def respond_to_member_requests(database):
-#     member_requests_table = database.tables["MemberPendingRequestTable"]
-#     project_id = input("Enter the ProjectID for the request: ")
-#     to_be_member = input("Enter the user ID to respond to: ")
-#     response = input("Enter your response (approve/reject): ")
-#     response_date = input("Enter the response date: ")
-#
-#     member_requests_table.update_request_response(project_id, to_be_member, response, response_date)
-#     member_requests_table.save_to_csv()
-#     print("Response recorded successfully.")
